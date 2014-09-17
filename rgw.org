@@ -1,0 +1,95 @@
+#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/2.5.0/
+#+REVEAL_TRANS: none
+#+OPTIONS: reveal_progress
+
+* Librados & Clients
+
+
+* Architecture
+#+CAPTION: Basic rgw/rados interaction
+#+header: :exports results
+#+BEGIN_SRC ditaa :file images/rgw-top-level.png :cmdline -r
+
+            +------------------------+ +------------------------+
+            |   S3 compatible API    | |  Swift compatible API  |
+            +------------------------+-+------------------------+
+            |                      radosgw                      |
+            +---------------------------------------------------+
+            |                      librados                     |
+            +------------------------+-+------------------------+
+            |          OSDs          | |        Monitors        |
+            +------------------------+ +------------------------+   
+
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rgw-top-level.png]]
+
+Another client for RADOS
+- Written in C++
+- FCGI module providing S3 & Swift compatible API
+- Both S3 & Swift objects live in common namespace
+- Other backends instead of fcgi also possible (civetweb,loadgen)
+
+** Basic Workflow
+- Rest Call -> libRados
+
+** Buckets/ Containers
+- How is it stored?
+- unique bucket name
+- FYI: Buckets in RGW & CRUSH Maps are totally different 
+** Users
+
+* Geo Replication
+
+** Rados replication
+- Synchronous writes & Strong Consistency model of ceph
+
+#+header: :exports results
+#+BEGIN_SRC ditaa :file images/ceph-writes.png :cmdline -r
+             +----------+
+             |  Client  |
+             |          |
+             +----------+
+                 *  ^
+      Write (1)  |  |  Ack (6)
+                 |  |
+                 v  *
+            +-------------+
+            | Primary OSD |
+            |             |
+            +-------------+
+              *  ^   ^  *
+    Write (2) |  |   |  |  Write (3)
+       +------+  |   |  +------+
+       |  +------+   +------+  |
+       |  | Ack (4)  Ack (5)|  | 
+       v  *                 *  v
+ +---------------+   +---------------+
+ | Secondary OSD |   | Tertiary OSD  |
+ |               |   |               |
+ +---------------+   +---------------+
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ceph-writes.png]]
+
+- Great for single DC deployments & nearby DCs etc.
+- Long distances => high write latency
+
+
+** Zones
+   
+** Region
+
+* Misc
+** Caching
+** GC
+---------
+*** Dump
+--------
+g_ceph_context 
+
+** Standard Deployment Architecture
