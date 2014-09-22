@@ -1,9 +1,8 @@
-#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/2.5.0/
+#+TITLE: Rados Gateway
+#+AUTHOR: Cloud IAAS Team
+#+EMAIL: abhishek.lekshmanan@ril.com
 #+REVEAL_TRANS: none
 #+OPTIONS: reveal_progress
-
-* Librados & Clients
-
 
 * Architecture
 #+CAPTION: Basic rgw/rados interaction
@@ -28,11 +27,33 @@
 
 Another client for RADOS
 - Written in C++
+- Rest Call -> libRados Call
 - FCGI module providing S3 & Swift compatible API
-- Both S3 & Swift objects live in common namespace
 - Other backends instead of fcgi also possible (civetweb,loadgen)
-- Rest Call -> libRados
+#+REVEAL: split
+
+- Both S3 & Swift objects live in common namespace
 - Objects stored into logical containers/buckets
+- Stores data in dedicated pools 
+  
+  1   .rgw
+  2   .rgw.root
+  3   .rgw.control
+  4   .rgw.gc
+  5   .rgw.buckets
+  6   .rgw.buckets.index
+  7   .log
+  8   .usage
+  9   .users
+  10  .users.email
+  11  .users.swift
+  12  .users.uid
+ 
+** Buckets
+- Sort of a namespace for objects 
+- Similiar to Amazon S3
+- Maps to containers in Swift
+
 
 ** Objects
 - S3 or Swift objects may map to more than one striped Rados object
@@ -47,7 +68,7 @@ Another client for RADOS
 [r@ra:~]$ cat /dev/urandom | strings --bytes 1 | tr -d '\n\t ' | head --bytes 8192K > random.txt
 [r@ra:~]$ ls -lh random.txt
 -+rw-rw-r-- 1 r r 8.0M Sep 17 18:08 random.txt
-r@ra:~/ceph/src](⎇ master)$ 
+[r@ra:~/ceph/src](⎇ master)$ 
 sha1sum random.txt 
 61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
 [r@ra:~/ceph/src](⎇ master)$ s3 -us put my-first-bucket/random filename=random.txt
@@ -56,14 +77,33 @@ sha1sum random.txt
 ...
 #+end_src
 
-- Object has the object manifest which gives info about the tail
-- 
-** Buckets/ Containers
-- How is it stored?
-- unique bucket name
-- FYI: Buckets in RGW & CRUSH Maps are totally different 
+#+REVEAL: split
 
-** Users
+- Object has the object manifest which gives info about the tail
+- Using native librados client, we can get the object parts
+- Rejoining these should give us the original object
+
+#+REVEAL: split
+
+#+begin_src sh
+[r@ra:~/ceph/src](⎇ master)$ 
+./radosgw-admin object stat --bucket=my-first-bucket --object=random  | grep prefix 
+      "prefix": "._op2xmptte2DD7z3_9EjQKgmmRcWRWL_",
+r@ra:~/ceph/src]$ ./rados get default.4124.1_random random.part0 --pool .rgw.buckets
+[r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_1 random.part1 --pool .rgw.buckets
+[r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_2 random.part2 --pool .rgw.buckets
+
+# Now join the objects back 
+[r@ra:~/ceph/src]$ cat random.part0 random.part1 random.part2 > random.rados.txt
+
+# Verify we have the same object
+[r@ra:~/ceph/src](⎇ master)$ 
+sha1sum random.rados.txt 
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.rados.txt
+[r@ra:~/ceph/src](⎇ master)$ 
+sha1sum random.txt 
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
+#+end_src
 
 * Geo Replication
 
@@ -102,18 +142,29 @@ sha1sum random.txt
 
 - Great for single DC deployments & nearby DCs etc.
 - Long distances => high write latency
-
+- No support in librados itself for a geo-replication model
+- Hence implementation in RadosGW itself
 
 ** Zones
+A zone is a *logical* grouping of one or more Ceph Object Gateway 
+instance(s). A region has a master zone that processes client requests.
+
+- Contains User + Bucket data , metadata rados pools etc 
+- A set of rgw demons serving content 
    
 ** Region
+A region represents a *logical* geographic area and contains one
+or more zones. A cluster with multiple regions must specify a master region.
+
+** Sync
+- radosgw-agent provided to sync metadata (+ data) 
+
+file:images/zone-sync.png
+
+- Also metadata can be kept in sync across regions to ensure a unified ns
+
+file:images/region-sync.png
 
 * Misc
-** Caching
-** GC
----------
-*** Dump
---------
-g_ceph_context 
-
-** Standard Deployment Architecture
+- Caching
+- GC
