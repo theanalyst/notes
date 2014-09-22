@@ -31,14 +31,38 @@ Another client for RADOS
 - FCGI module providing S3 & Swift compatible API
 - Both S3 & Swift objects live in common namespace
 - Other backends instead of fcgi also possible (civetweb,loadgen)
-
-** Basic Workflow
 - Rest Call -> libRados
+- Objects stored into logical containers/buckets
 
+** Objects
+- S3 or Swift objects may map to more than one striped Rados object
+- RGW Object has 2 parts - an object logical head (olh) & an optional tail
+- olh has a max size of 512K, tail split into chunks of stripe_width (4M:default)
+- Technically you can join all the rados object to get back the object again
+- Lets do a small experiment to find out
+
+#+REVEAL: split
+
+#+begin_src sh
+[r@ra:~]$ cat /dev/urandom | strings --bytes 1 | tr -d '\n\t ' | head --bytes 8192K > random.txt
+[r@ra:~]$ ls -lh random.txt
+-+rw-rw-r-- 1 r r 8.0M Sep 17 18:08 random.txt
+r@ra:~/ceph/src](⎇ master)$ 
+sha1sum random.txt 
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
+[r@ra:~/ceph/src](⎇ master)$ s3 -us put my-first-bucket/random filename=random.txt
+8372224 bytes remaining (0% complete) ...
+294912 bytes remaining (96% complete) ...
+...
+#+end_src
+
+- Object has the object manifest which gives info about the tail
+- 
 ** Buckets/ Containers
 - How is it stored?
 - unique bucket name
 - FYI: Buckets in RGW & CRUSH Maps are totally different 
+
 ** Users
 
 * Geo Replication
