@@ -1,17 +1,17 @@
 [r@ra:~/ceph/src](⎇ master)$ s3 -us create my-first-bucket
 Bucket successfully created.
-[r@ra:~/ceph/src](⎇ master)$ 
+[r@ra:~/ceph/src](⎇ master)$
 Content-Length: 31
-                         Bucket                                 Created       
+			 Bucket                                 Created
 --------------------------------------------------------  --------------------
 my-first-bucket                                           2014-09-17T05:17:43Z
-[r@ra:~/ceph/src](⎇ master)$ 
+[r@ra:~/ceph/src](⎇ master)$
 ./rados --pool .rgw ls
 .bucket.meta.my-first-bucket:default.4124.1
 my-first-bucket
-./rados --pool .rgw.buckets.index ls                                                                                                    
+./rados --pool .rgw.buckets.index ls
 .dir.default.4124.1
-[r@ra:~/ceph/src](⎇ master)$ 
+[r@ra:~/ceph/src](⎇ master)$
 s3 -us put my-first-bucket/file-1 filename=README
 [r@ra:~/ceph/src](⎇ master)$ 
 ./rados --pool .rgw ls
@@ -141,3 +141,12 @@ default.4124.1_random
 # Now join the objects back 
 [r@ra:~/ceph/src](⎇ master)$ cat random.part0 random.part1 random.part2 > random.rados.txt
 [r@ra:~/ceph/src](⎇ master)$ diff random.txt random.rados.txt 
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.txt
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.
+random.part0      random.part1      random.part2      random.rados.txt  random.txt
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.rados.txt
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.rados.txt
