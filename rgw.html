@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Rados Gateway</title>
+<meta name="author" content="(Cloud IAAS Team)"/>
+
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/2.6.2/css/reveal.min.css"/>
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/2.6.2/css/theme/default.css" id="theme"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'http://cdn.jsdelivr.net/reveal.js/2.6.2/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section>
+<h1>Rados Gateway</h1>
+<h2>Cloud IAAS Team</h2>
+<h2><a href="mailto:abhishek.lekshmanan@ril.com">abhishek.lekshmanan@ril.com</a></h2>
+<h2></h2></section>
+<section>
+<h2>Table of Contents</h2><ul>
+<li>
+<a href="#sec-1">Architecture</a>
+<ul>
+<li>
+<a href="#sec-1-1">Buckets</a>
+</li>
+<li>
+<a href="#sec-1-2">Objects</a>
+</li>
+</ul>
+<li>
+<a href="#sec-2">Geo Replication</a>
+<ul>
+<li>
+<a href="#sec-2-1">Rados replication</a>
+</li>
+<li>
+<a href="#sec-2-2">Zones</a>
+</li>
+<li>
+<a href="#sec-2-3">Region</a>
+</li>
+<li>
+<a href="#sec-2-4">Sync</a>
+</li>
+</ul>
+<li>
+<a href="#sec-3">Misc</a>
+</li>
+</ul>
+</section>
+<section>
+<section id="sec-1" >
+
+<h2><span class="section-number-2">1</span> Architecture</h2>
+<img src="images/rgw-top-level.png" alt="rgw-top-level.png" />
+
+<p>
+Another client for RADOS
+</p>
+<ul class="org-ul">
+<li>Written in C++
+</li>
+<li>Rest Call -&gt; libRados Call
+</li>
+<li>FCGI module providing S3 &amp; Swift compatible API
+</li>
+<li>Other backends instead of fcgi also possible (civetweb,loadgen)
+</li>
+</ul>
+</section>
+<section>
+
+<ul class="org-ul">
+<li>Both S3 &amp; Swift objects live in common namespace
+</li>
+<li>Objects stored into logical containers/buckets
+</li>
+<li>Stores data (as rados objects) in dedicated pools
+<ul class="org-ul">
+<li>.rgw
+</li>
+<li>.rgw.root
+</li>
+<li>.rgw.control
+</li>
+<li>.rgw.gc
+</li>
+<li>.rgw.buckets
+</li>
+<li>.rgw.buckets.index
+</li>
+<li>.users
+</li>
+<li>.users.email
+</li>
+<li>.users.swift
+</li>
+<li>.users.uid
+</li>
+</ul>
+</li>
+</ul>
+
+</section>
+<section id="sec-1-1" >
+
+<h3><span class="section-number-3">1.1</span> Buckets</h3>
+<ul class="org-ul">
+<li>Sort of a namespace for objects
+</li>
+<li>Similiar to Amazon S3
+</li>
+<li>Maps to containers in Swift
+</li>
+<li>Stored in the root pool (.rgw)
+</li>
+<li>Buckets owned by a user stored as an xattr in users uid pool
+</li>
+</ul>
+
+</section>
+<section>
+<p>
+<b>Bucket Creation (β)</b>
+</p>
+<ul class="org-ul">
+<li>A bucket instance object created in root pool (.rgw)
+</li>
+<li>This points to another bucket metadata object in same pool
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre  class="src src-sh">[r@ra:~/ceph/src](&#9095; master)$ s3 -us create my-first-bucket
+Bucket successfully created.
+[r@ra:~/ceph/src](&#9095; master)$ s3 -us list
+Content-Length: 31
+                         Bucket                                 Created
+--------------------------------------------------------  --------------------
+my-first-bucket                                           2014-09-17T05:17:43Z
+[r@ra:~/ceph/src](&#9095; master)$ ./rados --pool .rgw ls
+.bucket.meta.my-first-bucket:default.4124.1
+my-first-bucket
+</pre>
+</div>
+
+</section>
+<section>
+<ul class="org-ul">
+<li>As we start storing objects, they are stored as xattrs in buckets.index pool
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre  class="src src-sh">[r@ra:~/ceph/src](&#9095; master)$ ./rados -p .rgw.buckets.index ls
+.dir.default.4124.2
+.dir.default.4124.1
+
+[r@ra:~/ceph/src](&#9095; master)$ ./rados -p .rgw.buckets.index listomapkeys .dir.default.4124.1
+big-object
+file-1
+object-8
+random
+</pre>
+</div>
+
+</section>
+<section id="sec-1-2" >
+
+<h3><span class="section-number-3">1.2</span> Objects</h3>
+<ul class="org-ul">
+<li>Basically files eg. images, videos, text etc.
+</li>
+<li>S3 or Swift objects may map to more than one striped Rados object
+</li>
+<li>Splitting required whenever object size &gt; 512K
+</li>
+<li>RGW Object has 2 parts - an object logical head (olh) &amp; an optional tail
+</li>
+<li>olh has a max size of 512K, tail split into chunks of stripe<sub>width</sub> (4M:default)
+</li>
+<li>Technically you can join all the rados object to get back the object again
+</li>
+<li>Lets do a small experiment to find out
+</li>
+</ul>
+
+</section>
+<section>
+
+<div class="org-src-container">
+
+<pre  class="src src-sh">[r@ra:~]$ cat /dev/urandom | strings --bytes 1 | tr -d <span style="color: #E6DB74;">'\n\t '</span> | head --bytes 8192K &gt; random.txt
+[r@ra:~]$ ls -lh random.txt
+-+rw-rw-r-- 1 r r 8.0M Sep 17 18:08 random.txt
+[r@ra:~/ceph/src](&#9095; master)$
+sha1sum random.txt
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
+[r@ra:~/ceph/src](&#9095; master)$ s3 -us put my-first-bucket/random <span style="color: #F92672;">filename</span>=random.txt
+8372224 bytes remaining (0% complete) ...
+294912 bytes remaining (96% complete) ...
+...
+</pre>
+</div>
+
+</section>
+<section>
+
+<ul class="org-ul">
+<li>Object has the object manifest which gives info about the tail
+</li>
+<li>Manifest stored as a xattr in the olh object
+</li>
+<li>Using native librados client, we can get the object parts
+</li>
+<li>Rejoining these should give us the original object
+</li>
+</ul>
+
+</section>
+<section>
+<div class="org-src-container">
+
+<pre  class="src src-json">[r@ra:~/ceph/src](⎇ master)$ ./radosgw-admin object stat --bucket=my-first-bucket --object=random
+{ "name": "random",
+  "size": 8388608,
+  "policy": {...}},
+  "etag": "fe0d04f8865fd6f95d079132746dc04b",
+  "tag": "default.4124.0",
+  "manifest": { "objs": [],
+      "obj_size": 8388608,
+      "explicit_objs": "false",
+      "head_obj": { "bucket": { "name": "my-first-bucket",
+	      "pool": ".rgw.buckets",
+	      "data_extra_pool": ".rgw.buckets.extra",
+	      "index_pool": ".rgw.buckets.index",
+	      "marker": "default.4124.1",
+	      "bucket_id": "default.4124.1"}...},
+      "head_size": 524288,
+      "max_head_size": 524288,
+      "prefix": "._op2xmptte2DD7z3_9EjQKgmmRcWRWL_",
+      "tail_bucket": { "name": "my-first-bucket",
+	  "pool": ".rgw.buckets",...
+	  "bucket_id": "default.4124.1"},
+      "rules": [
+	    { "key": 0,
+	      "val": { "start_part_num": 0,
+		  "start_ofs": 524288,
+		  "part_size": 0,
+		  "stripe_max_size": 4194304,...}}]},
+  "attrs": { "user.rgw.x-amz-date": "Wed, 17 Sep 2014 12:40:42 GMT"}}
+</pre>
+</div>
+
+</section>
+<section>
+<div class="org-src-container">
+
+<pre  class="src src-sh">[r@ra:~/ceph/src](&#9095; master)$
+./radosgw-admin object stat --bucket=my-first-bucket --object=random  | grep prefix
+      <span style="color: #E6DB74;">"prefix"</span>: <span style="color: #E6DB74;">"._op2xmptte2DD7z3_9EjQKgmmRcWRWL_"</span>,
+r@ra:~/ceph/src]$ ./rados get default.4124.1_random random.part0 --pool .rgw.buckets
+[r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_1 random.part1 --pool .rgw.buckets
+[r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_2 random.part2 --pool .rgw.buckets
+
+<span style="color: #465457; font-style: italic;"># </span><span style="color: #465457; font-style: italic;">Now join the objects back</span>
+[r@ra:~/ceph/src]$ cat random.part0 random.part1 random.part2 &gt; random.rados.txt
+
+<span style="color: #465457; font-style: italic;"># </span><span style="color: #465457; font-style: italic;">Verify we have the same object</span>
+[r@ra:~/ceph/src](&#9095; master)$
+sha1sum random.rados.txt
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.rados.txt
+[r@ra:~/ceph/src](&#9095; master)$
+sha1sum random.txt
+61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
+</pre>
+</div>
+</section>
+
+</section>
+<section>
+<section id="sec-2" >
+
+<h2><span class="section-number-2">2</span> Geo Replication</h2>
+</section>
+<section id="sec-2-1" >
+
+<h3><span class="section-number-3">2.1</span> Rados replication</h3>
+<ul class="org-ul">
+<li>Synchronous writes &amp; Strong Consistency model of ceph
+</li>
+</ul>
+
+<img src="images/ceph-writes.png" alt="ceph-writes.png" />
+
+<ul class="org-ul">
+<li>Great for single DC deployments &amp; nearby DCs etc.
+</li>
+<li>Long distances =&gt; high write latency
+</li>
+<li>No support in librados itself for a geo-replication model
+</li>
+<li>Hence implementation in RadosGW itself
+</li>
+</ul>
+
+</section>
+<section id="sec-2-2" >
+
+<h3><span class="section-number-3">2.2</span> Zones</h3>
+<p>
+A zone is a <b>logical</b> grouping of one or more Ceph Object Gateway
+instance(s). A region has a master zone that processes client requests.
+</p>
+
+<ul class="org-ul">
+<li>Contains User + Bucket data , metadata rados pools etc
+</li>
+<li>A set of rgw demons serving content
+</li>
+</ul>
+
+</section>
+<section id="sec-2-3" >
+
+<h3><span class="section-number-3">2.3</span> Region</h3>
+<p>
+A region represents a <b>logical</b> geographic area and contains one
+or more zones. A cluster with multiple regions must specify a master region.
+</p>
+
+</section>
+<section id="sec-2-4" >
+
+<h3><span class="section-number-3">2.4</span> Sync</h3>
+<ul class="org-ul">
+<li>radosgw-agent provided to sync metadata (+ data)
+</li>
+</ul>
+
+<img src="images/zone-sync-2.png" alt="zone-sync-2.png" />
+
+</section>
+<section>
+
+<ul class="org-ul">
+<li>Also data can be kept in sync across multi-region
+</li>
+</ul>
+
+<img src="images/dr.png" alt="dr.png" />
+</section>
+
+</section>
+<section>
+<section id="sec-3" >
+
+<h2><span class="section-number-2">3</span> Misc</h2>
+<dl class="org-dl">
+<dt><b>Caching</b></dt><dd>Requests cached using an LRU Cache
+</dd>
+<dt><b>GC</b></dt><dd>Run at a configurable interval to sweep off deleted objects
+</dd>
+</dl>
+</section>
+</section>
+</div>
+</div>
+
+<script src="http://cdn.jsdelivr.net/reveal.js/2.6.2/lib/js/head.min.js"></script>
+<script src="http://cdn.jsdelivr.net/reveal.js/2.6.2/js/reveal.min.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: true,
+rollingLinks: false,
+keyboard: true,
+overview: true,
+margin: 0.10,
+minScale: 0.01,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'none', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/2.6.2/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+]
+});
+</script>
+</body>
+</html>
