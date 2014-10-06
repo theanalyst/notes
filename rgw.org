@@ -5,8 +5,8 @@
 #+OPTIONS: reveal_progress
 #+REVEAL_MIN_SCALE: 0.01
 #+REVEAL_MARGIN: 0.1
-#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/2.5.0/
-
+#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/2.6.2/
+#+REVEAL_SLIDE_NUMBER: t
 * Architecture
 #+CAPTION: Basic rgw/rados interaction
 #+header: :exports results
