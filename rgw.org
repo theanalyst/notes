@@ -3,21 +3,23 @@
 #+EMAIL: abhishek.lekshmanan@ril.com
 #+REVEAL_TRANS: none
 #+OPTIONS: reveal_progress
+#+REVEAL_MIN_SCALE: 0.01
+#+REVEAL_MARGIN: 0.1
 
 * Architecture
 #+CAPTION: Basic rgw/rados interaction
 #+header: :exports results
 #+BEGIN_SRC ditaa :file images/rgw-top-level.png :cmdline -r
 
-            +------------------------+ +------------------------+
-            |   S3 compatible API    | |  Swift compatible API  |
-            +------------------------+-+------------------------+
-            |                      radosgw                      |
-            +---------------------------------------------------+
-            |                      librados                     |
-            +------------------------+-+------------------------+
-            |          OSDs          | |        Monitors        |
-            +------------------------+ +------------------------+   
+	    +------------------------+ +------------------------+
+	    |   S3 compatible API    | |  Swift compatible API  |
+	    +------------------------+-+------------------------+
+	    |                      radosgw                      |
+	    +---------------------------------------------------+
+	    |                      librados                     |
+	    +------------------------+-+------------------------+
+	    |          OSDs          | |        Monitors        |
+	    +------------------------+ +------------------------+
 
 
 #+END_SRC
@@ -34,29 +36,60 @@ Another client for RADOS
 
 - Both S3 & Swift objects live in common namespace
 - Objects stored into logical containers/buckets
-- Stores data in dedicated pools 
-  
-  1   .rgw
-  2   .rgw.root
-  3   .rgw.control
-  4   .rgw.gc
-  5   .rgw.buckets
-  6   .rgw.buckets.index
-  7   .log
-  8   .usage
-  9   .users
-  10  .users.email
-  11  .users.swift
-  12  .users.uid
- 
+- Stores data (as rados objects) in dedicated pools
+  + .rgw
+  + .rgw.root
+  + .rgw.control
+  + .rgw.gc
+  + .rgw.buckets
+  + .rgw.buckets.index
+  + .users
+  + .users.email
+  + .users.swift
+  + .users.uid
+
 ** Buckets
-- Sort of a namespace for objects 
+- Sort of a namespace for objects
 - Similiar to Amazon S3
 - Maps to containers in Swift
+- Stored in the root pool (.rgw)
+- Buckets owned by a user stored as an xattr in users uid pool
 
+#+REVEAL: split
+*Bucket Creation (β)*
+- A bucket instance object created in root pool (.rgw)
+- This points to another bucket metadata object in same pool
+#+begin_src sh
+[r@ra:~/ceph/src](⎇ master)$ s3 -us create my-first-bucket
+Bucket successfully created.
+[r@ra:~/ceph/src](⎇ master)$ s3 -us list
+Content-Length: 31
+			 Bucket                                 Created
+--------------------------------------------------------  --------------------
+my-first-bucket                                           2014-09-17T05:17:43Z
+[r@ra:~/ceph/src](⎇ master)$ ./rados --pool .rgw ls
+.bucket.meta.my-first-bucket:default.4124.1
+my-first-bucket
+#+end_src
+
+#+REVEAL: split
+- As we start storing objects, they are stored as xattrs in buckets.index pool
+#+begin_src sh
+[r@ra:~/ceph/src](⎇ master)$ ./rados -p .rgw.buckets.index ls
+.dir.default.4124.2
+.dir.default.4124.1
+
+[r@ra:~/ceph/src](⎇ master)$ ./rados -p .rgw.buckets.index listomapkeys .dir.default.4124.1
+big-object
+file-1
+object-8
+random
+#+end_src
 
 ** Objects
+- Basically files eg. images, videos, text etc.
 - S3 or Swift objects may map to more than one striped Rados object
+- Splitting required whenever object size > 512K
 - RGW Object has 2 parts - an object logical head (olh) & an optional tail
 - olh has a max size of 512K, tail split into chunks of stripe_width (4M:default)
 - Technically you can join all the rados object to get back the object again
@@ -68,8 +101,8 @@ Another client for RADOS
 [r@ra:~]$ cat /dev/urandom | strings --bytes 1 | tr -d '\n\t ' | head --bytes 8192K > random.txt
 [r@ra:~]$ ls -lh random.txt
 -+rw-rw-r-- 1 r r 8.0M Sep 17 18:08 random.txt
-[r@ra:~/ceph/src](⎇ master)$ 
-sha1sum random.txt 
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.txt
 61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
 [r@ra:~/ceph/src](⎇ master)$ s3 -us put my-first-bucket/random filename=random.txt
 8372224 bytes remaining (0% complete) ...
@@ -80,28 +113,62 @@ sha1sum random.txt
 #+REVEAL: split
 
 - Object has the object manifest which gives info about the tail
+- Manifest stored as a xattr in the olh object
 - Using native librados client, we can get the object parts
 - Rejoining these should give us the original object
 
 #+REVEAL: split
+#+begin_src json
+[r@ra:~/ceph/src](⎇ master)$ ./radosgw-admin object stat --bucket=my-first-bucket --object=random
+{ "name": "random",
+  "size": 8388608,
+  "policy": {...}},
+  "etag": "fe0d04f8865fd6f95d079132746dc04b",
+  "tag": "default.4124.0",
+  "manifest": { "objs": [],
+      "obj_size": 8388608,
+      "explicit_objs": "false",
+      "head_obj": { "bucket": { "name": "my-first-bucket",
+	      "pool": ".rgw.buckets",
+	      "data_extra_pool": ".rgw.buckets.extra",
+	      "index_pool": ".rgw.buckets.index",
+	      "marker": "default.4124.1",
+	      "bucket_id": "default.4124.1"}...},
+      "head_size": 524288,
+      "max_head_size": 524288,
+      "prefix": "._op2xmptte2DD7z3_9EjQKgmmRcWRWL_",
+      "tail_bucket": { "name": "my-first-bucket",
+	  "pool": ".rgw.buckets",...
+	  "bucket_id": "default.4124.1"},
+      "rules": [
+	    { "key": 0,
+	      "val": { "start_part_num": 0,
+		  "start_ofs": 524288,
+		  "part_size": 0,
+		  "stripe_max_size": 4194304,...}}]},
+  "attrs": { "user.rgw.x-amz-date": "Wed, 17 Sep 2014 12:40:42 GMT"}}
 
+
+#+end_src
+
+#+REVEAL: split
 #+begin_src sh
-[r@ra:~/ceph/src](⎇ master)$ 
-./radosgw-admin object stat --bucket=my-first-bucket --object=random  | grep prefix 
+[r@ra:~/ceph/src](⎇ master)$
+./radosgw-admin object stat --bucket=my-first-bucket --object=random  | grep prefix
       "prefix": "._op2xmptte2DD7z3_9EjQKgmmRcWRWL_",
 r@ra:~/ceph/src]$ ./rados get default.4124.1_random random.part0 --pool .rgw.buckets
 [r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_1 random.part1 --pool .rgw.buckets
 [r@ra:~/ceph/src]$ ./rados get default.4124.1__shadow_._op2xmptte2DD7z3_9EjQKgmmRcWRWL_2 random.part2 --pool .rgw.buckets
 
-# Now join the objects back 
+# Now join the objects back
 [r@ra:~/ceph/src]$ cat random.part0 random.part1 random.part2 > random.rados.txt
 
 # Verify we have the same object
-[r@ra:~/ceph/src](⎇ master)$ 
-sha1sum random.rados.txt 
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.rados.txt
 61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.rados.txt
-[r@ra:~/ceph/src](⎇ master)$ 
-sha1sum random.txt 
+[r@ra:~/ceph/src](⎇ master)$
+sha1sum random.txt
 61ea6dd7ff4a2de1e9ed12a43d60c2bbfa59b038  random.txt
 #+end_src
 
@@ -112,23 +179,23 @@ sha1sum random.txt
 
 #+header: :exports results
 #+BEGIN_SRC ditaa :file images/ceph-writes.png :cmdline -r
-             +----------+
-             |  Client  |
-             |          |
-             +----------+
-                 *  ^
+	     +----------+
+	     |  Client  |
+	     |          |
+	     +----------+
+		 *  ^
       Write (1)  |  |  Ack (6)
-                 |  |
-                 v  *
-            +-------------+
-            | Primary OSD |
-            |             |
-            +-------------+
-              *  ^   ^  *
+		 |  |
+		 v  *
+	    +-------------+
+	    | Primary OSD |
+	    |             |
+	    +-------------+
+	      *  ^   ^  *
     Write (2) |  |   |  |  Write (3)
        +------+  |   |  +------+
        |  +------+   +------+  |
-       |  | Ack (4)  Ack (5)|  | 
+       |  | Ack (4)  Ack (5)|  |
        v  *                 *  v
  +---------------+   +---------------+
  | Secondary OSD |   | Tertiary OSD  |
@@ -146,25 +213,27 @@ sha1sum random.txt
 - Hence implementation in RadosGW itself
 
 ** Zones
-A zone is a *logical* grouping of one or more Ceph Object Gateway 
+A zone is a *logical* grouping of one or more Ceph Object Gateway
 instance(s). A region has a master zone that processes client requests.
 
-- Contains User + Bucket data , metadata rados pools etc 
-- A set of rgw demons serving content 
-   
+- Contains User + Bucket data , metadata rados pools etc
+- A set of rgw demons serving content
+
 ** Region
 A region represents a *logical* geographic area and contains one
 or more zones. A cluster with multiple regions must specify a master region.
 
 ** Sync
-- radosgw-agent provided to sync metadata (+ data) 
+- radosgw-agent provided to sync metadata (+ data)
 
-file:images/zone-sync.png
+file:images/zone-sync-2.png
 
-- Also metadata can be kept in sync across regions to ensure a unified ns
+#+REVEAL: split
 
-file:images/region-sync.png
+- Also data can be kept in sync across multi-region
+
+file:images/dr.png
 
 * Misc
-- Caching
-- GC
+- Caching :: Requests cached using an LRU Cache
+- GC :: Run at a configurable interval to sweep off deleted objects
