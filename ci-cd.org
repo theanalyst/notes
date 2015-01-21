@@ -1,0 +1,50 @@
+* Puppet RJIL
+** deploy.sh
+
+- Generates single userdata utils
+- Applies Layout- looks a lot like heat templates -- eventually replaced by heat? (No need to use a centralized server)
+This triggers async pkg builds
+- Blocks & Retries until consul is ready
+
+*** Userdata
+- used to bootstrap cloud services
+- primarily used to bootstrap puppet data .. though other thoings
+- /var/lib/cloud-init.log
+
+*** apply resources
+(all,none,some) of resources are created. Uses openstack api's for all purposes.
+
+
+- ultimately calls files/maybe-upgrade.sh
+- Probably use modular arithmetic to findout things I need to upgrade
+- Jenkins build packages and writes to K-V store
+- Librarian puppet -> files - modules
+** Consul
+K-V store
+- Service registration and discovery
+- Orchestration
+- acts as a DNS server
+- each node can query consul
+- Block until DNS resolves
+- Asynch 
+- fail subgraph if data is missing
+
+Puppet - DAG structures (remember Git?)
+- we can block certain services until the DNS returns arecords
+- Arecord -> service is functional
+- Failing a vertex fails the subgraph
+- IDEMPOTENCY!
+-- Where is this defined???
+- Providers should be idempotent (CEPH KEYS)
+** Hiera
+- stores all data
+- all environment differences
+- the *only* environment differences
+
+** Facter
+- provides node specific details
+
+* Common Design Principles
+- 
+
+* Questions

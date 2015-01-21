@@ -1,0 +1,55 @@
+* Overview
+- Consistency (Idempotent): Reruns for eg. of bash scripts are
+  difficult, reaching a desired state from an inconsistent state.
+
+- Abstractions (Declarative)
+
+- Deployment Velocity (Confidence)
+
+* Discovery and Resources
+
+** Facter
+Contains hash of sys specific information
+#+begin_src sh
+$ facter operatingsystem
+Ubuntu
+ubunt$ FACTER_manufacturer=hp facter manufacturer
+hp
+
+#+end_src
+
+- Determines data lookup in hiera
+- /etc/facter/facts.d/* can be used to inject facts
+- Build specific information injected from userdata
+- All facts are top level variables
+#+begin_src sh
+$ sudo echo 'env='at | sudo tee /etc/facter/facts.d/env.txt
+#+end_src
+
+- params.pp -> commmonly used for multiple 
+
+** Puppet Resource
+* Resources
+- state of individual components
+- One of the main purpose of Puppet is to create a graph of resources
+** Core resources
+- Package
+- file
+- user
+- group
+- service
+
+Check puppet 
+* Puppet Language
+
+* Data & Puppet
+ENC- External Node Classifier1
+
+* Puppet Abstractions
+
+* Jiocloud
+** deploy
+- userdata
+- create VMS
+- inject build data into consul
+- monitor progress
