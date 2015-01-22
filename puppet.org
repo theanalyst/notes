@@ -26,7 +26,8 @@ hp
 $ sudo echo 'env='at | sudo tee /etc/facter/facts.d/env.txt
 #+end_src
 
-- params.pp -> commmonly used for multiple 
+- params.pp -> commmonly used module specific parameterization (as
+  opposed to user spec. parameterization) and stuff that depends based on platform etc
 
 ** Puppet Resource
 * Resources
@@ -39,13 +40,102 @@ $ sudo echo 'env='at | sudo tee /etc/facter/facts.d/env.txt
 - group
 - service
 
+** general 
+- ensure = present or absent to create or delete resources
+
+- While writing providers, ensure that the system calls are displayed
+  so that it is easier to understand failures
 Check puppet 
-* Puppet Language
+
+- =Parameters are not idempotent, Properties are, look at managehome attr in User type=
+- Managed Attributes are not 
+
+** Providers
+concrete implementation of res. types; `params.pp` 
+- Primarily implement discovery and Update for providers
+
+* Puppet 
+** Language
+- Compile time generates DataStructure
+- Apply time applies operation (Runtime)
+- All decisions to determine/interpolate values at runtime is during compile time 
+- eg Types -> compile + apply time (mostly), 
+  hiera -> compile, 
+  facter → compile + apply (eg. for providers), 
+  puppet functions → compile
+  most of puppet DSL is during compile time
+
+- Most of the differences between chef and Puppet is about the compile time, chef supports more dynamic runtime defs
+
+
+*** Relationships
+- Edges in Graph are created using Relationships
+- Explicit spec of resoure order:
+  + Before
+  + Require
+  + Notify
+  + Suscribe
+
+- Every resource is id by a uniq comb of type and title, Explicit dependencies always win in the graph, deterministically determined by the above order
+  Before + Require → Type['name']
+  
+- Same manifests always generate the same graph
+- ⇝ dependency arrow  
+#+begin_src puppet
+  Package['httpd'] ~>
+  File['etc/httpd/httpd.conf'] ~>
+  Service['httpd']
+  package { 'httpd',
+    ensure => present,
+  }
+
+  file { '/etc/httpd/httpd.conf',
+    content => template(httpd.conf.erb),
+  }
+
+  service { 'httpd',
+    service => running,
+  }
+#+end_src
+
+*** Variables
+- Lexically scoped
+- interpolation ' vs "
+- facts live in global namespace
+- Heira is an external data lookup system, an implementation of dependency system
+- nil vs '' not clearly defined
+- ⊥ variables are allowed, special keyword `undef`, they dont populate the key value pair
+- namevars override the title pattern, however title & namevers are alias 
+- dont dynamically set titles, set namevars instead
+
+*** Containers
+*** Classes
+- include and declarative style of declaration
+- when using include style, use hiera to initialize, don't use in libraries, but in composition layer
+#+begin_src puppet
+  include 'apache'
+
+  class {'apache':
+    port => '8080',
+    }
+#+end_src
+- heira binds to class params 
+- classes are singletons
+
+** Puppet Run
+- Uses PKI Certificates
+- Types & Provider code need to be in the puppet master/server at compile time
 
 * Data & Puppet
 ENC- External Node Classifier1
 
+Resources → Modules → profiles → Role → Node 
+             
 * Puppet Abstractions
+* Hiera
+- Lowest to highest order of pref 
+
+
 
 * Jiocloud
 ** deploy
@@ -53,3 +143,7 @@ ENC- External Node Classifier1
 - create VMS
 - inject build data into consul
 - monitor progress
+- Everything must be self verifying and register themselves with consul 
+* Explore
+- Includes vs (inherits → used in params etc. eg. MariaDB module)
+- PKI (also need patches in consul) 
