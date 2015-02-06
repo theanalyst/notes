@@ -57,7 +57,7 @@ Another client for RADOS
 - Buckets owned by a user stored as an xattr in users uid pool
 
 #+REVEAL: split
-*Bucket Creation (β)*
+*Bucket Creation 
 - A bucket instance object created in root pool (.rgw)
 - This points to another bucket metadata object in same pool
 #+begin_src sh
