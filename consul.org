@@ -1,0 +1,71 @@
+#+TITLE: Service Discovery & Consul
+#+AUTHOR: Cloud IAAS Team
+#+EMAIL: abhishek.lekshmanan@ril.com
+#+REVEAL_TRANS: none
+#+OPTIONS: reveal_progress
+#+REVEAL_MIN_SCALE: 0.01
+#+REVEAL_MARGIN: 0.1
+#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/2.6.2/
+#+REVEAL_SLIDE_NUMBER: t
+#+REVEAL_THEME: serif
+
+
+* SOA
+** Characteristics
+- Loose coupling
+- Self contained
+- Generally logical unit doing some limited item eg. authenticate user
+
+Opposite of classical monolithic architectures
+
+** Examples
+
+Webapp -> Processing -> DB
+
+Obviously you want replicated app
+
+Webapp -> Processing1
+          Processing2
+	  Processing3
+
+
+Webapp -> LB - > Processing(1,2,3)
+
+However we have now introduced a single point of failure
+
+Alternatively,
+
+the app itself is intelligent enough to route the request to the
+correct app, 
+
+However this introduces problems of health checks, membership etc.
+
+Also how to push a configuration change to every member?
+
+** Problems
+- Service Discovery?
+- Health Checking
+- Configuration Management
+
+
+#+begin_src artist
+     +------------+               +---------------+         +-------+
+     |            | --------------|               |         +-------+
+     |   app      |               |    LB         |          +--------+
+     +------------+               +---------------+          +--------+
+                                                             +---------+
+                                                             +---------+
+#+end_src
+
+** Problem Statement 
+How do various services sync on their activities & come to agree on
+  the basic information about their environment
+
+* Chubby
+- http://research.google.com/archive/chubby.html
+(Not an algo paper, very much an engineering paper. Excellent use of
+algorithmic concepts & create a system usable by many apps)
+- Coarse grained lock service for loosely coupled distributed systems
+- At its core, Paxos (as a service?)
+
+- Later an inspiration for ZK, doozerd, etcd & now consul
