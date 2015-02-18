@@ -125,7 +125,45 @@ concrete implementation of res. types; `params.pp`
 ** Puppet Run
 - Uses PKI Certificates
 - Types & Provider code need to be in the puppet master/server at compile time
+*** Authentication
+CA (generates a PK & self signs) → Puppet Master uses this → Client
+queries master to sign requests
+- Certificates are signed manually by default, autosign signs CSR's automatically
+- policy file (~ RBAC)
+- Hiera relies on facts (is less secure) (ENC? )
 
+*** ENC
+typical puppet 
+
+facts → hiera → DSL
+
+With ENC
+
+facts → (ENC → hiera → DSL)
+            ^
+	    |
+	  These occur on the server
+
+- More secure, as facts are not reliable (eg if client is
+  compromised); since PKI based auth is used for clients
+- Array of classes , # params
+**** TODO Node Terminus
+
+*** Master vs Masterless
+*** Environments
+- Primarily used in master → client mode
+*** Extending Puppet
+**** Custom Facts
+facts.d 
+~∷$foo~ should be preferably used to explicitly mention the global scope
+static facts should be in facts.d 
+dynamic ones should preferably be generated using custom facts ruby .
+
+- Use define pattern to do iteration
+**** Functions
++ Compile time
++ STDLIB provides some 30 functions or so
++ live in lib/parser name of function needs to be the name of the file
 * Data & Puppet
 ENC- External Node Classifier1
 
@@ -144,6 +182,50 @@ Resources → Modules → profiles → Role → Node
 - inject build data into consul
 - monitor progress
 - Everything must be self verifying and register themselves with consul 
+Jenkins → Userdata in JioCloud onto custom facts (over nova api metadata)
 * Explore
 - Includes vs (inherits → used in params etc. eg. MariaDB module)
-- PKI (also need patches in consul) 
+- PKI (also need patches in consul) required for consul
+- Google's use of DNS
+- X-host dependency models with blocking 
+
+
+* Consul 
+
+- Every member seems to be listed from other cluster ~consul members~
+- Gossip protocol between members
+- K/V sore uses raft
+- Gossip obviously doesn't rely on raft
+- Consul is DC aware, can relay across DNS of other DC's
+- Ports: HTTP 8500, DNS 8600
+- As events related to service registration & dereg. are created, A
+  records and SRV records are created in the DNS
+- Basically register services, add checks, local DNS is provided by consul
+- Every single machine has a consul agent running 
+
+
+3 Roles are offered:
+
+** Bootstrap Server
+Token taken from BS, registers the private ip with token to a public DNS
+similiar to etcd boostraping 
+
+** Servers
+
+** Agents
+
+
+
+#+begin_src ditaa
+
+
+#+end_src
+
+
+*** Example
+memcache; define a service port & check command
+
+create a json file -> in /etc/consul/ 
+
+*** BUG on memcached; script always returns 1 
+
