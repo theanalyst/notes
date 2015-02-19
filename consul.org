@@ -75,7 +75,7 @@ anti-pattern! As this now introduces a single point of failure
 - Health Checking
 - Configuration Management: whether a configuration file change can be
   reflected in all nodes easily?
-
+  
 ** Question
 How do various services sync on their activities & come to agree on
 the basic information about their environment
@@ -123,12 +123,13 @@ TBD
 CP model, ensured via Raft consensus by consul servers
 Three modes
 ***** default  
-+ all reads go through the leader
-+ However in a network partition, potential stale value possible for reads only. 
-+ Primarily because reads are serviced by a leader without commiting into the raft log yet
-+ Sort of performance tradeoff, against consistency (for reads only)
-+ Sort of default for etcd. 
-+ Writes are guaranteed to be consistent
+- all reads go through the leader
+- However in a network partition, potential stale value possible for reads only. 
+- Primarily because reads are serviced by a leader without commiting into the raft log yet
+- Sort of performance tradeoff, against consistency (for reads only)
+  as this otherwise involves a round trip to the leader in quorum
+- Sort of default for etcd. 
+- Writes are guaranteed to be consistent, so are reads after writes. 
 
 ***** consistent
 - all reads go through leader, also there is one more round trip to
@@ -202,5 +203,4 @@ GET http://localhost:8500/v1/kv/service/ceph/leader
 
 # Step down
 PUT http://localhost:8500/v1/kv/service/ceph/leader?release=3eeab2e5-4c1a-fd92-8beb-9fcc795d8ee6
-#+end_src
-
+#+end_src     
