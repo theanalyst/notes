@@ -116,7 +116,7 @@ why, rather than to advocate it.
 - DNS interface allows existing services to use consul without any modifications
 
 ** Architecture
-
+TBD
 
 *** KV Store
 **** Consistency
@@ -141,9 +141,6 @@ ensure that the leader in quorum only services read.
 - Potential stale value possible within 50ms of the leader
 - Tradeoff : fast & scaleable reads (this is default in k-v stores like etcd)
 
-**** Rest API
-Demo
-
 **** Leader Election
 - Leverage K-V store to aid in leader elections
 - Use an agreed upon key, of sort ~service/<service-name>/leader~
@@ -153,4 +150,57 @@ Demo
 - Simple script on nodes running agents.
 - Need to provide nagios style 0,1,2 status
 - Consul combines a service level health checks + Serf, a gossip based protocol to check for agents
+
+** Demo
+**** Rest API
+#+begin_src restclient
+#-*- restclient -*-
+# K-V store 
+# index
+GET http://localhost:8500/v1/kv/?recurse
+
+
+# Get a value from the k-v store
+# also consistent? and stale? modes
+GET http://localhost:8500/v1/kv/foo
+
+  
+# update the same value?
+PUT http://localhost:8500/v1/kv/foo
+ContentType: text/json
+barbar
+
+# check & set
+PUT http://localhost:8500/v1/kv/foo?cas=2834
+bar
+
+# Wait for change (and for a time of 120s)
+# (setq restclient-same-buffer-response t)
+GET http://localhost:8500/v1/kv/foo?index=2866&wait=120s
+
+# Services
+GET http://localhost:8500/v1/agent/services
+
+
+# Incomplete
+# Session
+PUT http://localhost:8500/v1/session/create
+{
+  "LockDelay": "60s",
+  "Name": "ceph-service-lock",
+  "Node": "node2",
+  "Checks": ["service:ceph"]
+}
+  
+
+## Leader Election
+PUT http://localhost:8500/v1/kv/service/ceph/leader?d8b758ac-6810-a093-a839-76ee0969898c
+node2
+
+# Watch for the key changes
+GET http://localhost:8500/v1/kv/service/ceph/leader
+
+# Step down
+PUT http://localhost:8500/v1/kv/service/ceph/leader?release=3eeab2e5-4c1a-fd92-8beb-9fcc795d8ee6
+#+end_src
 
