@@ -1,0 +1,156 @@
+#+TITLE: Service Discovery & Consul
+#+AUTHOR: Abhishek L
+#+EMAIL: @abhishekl
+#+REVEAL_TRANS: none
+#+OPTIONS: reveal_progress toc:nil
+#+REVEAL_MIN_SCALE: 0.01
+#+REVEAL_MARGIN: 0.1
+#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/3.0.0
+#+REVEAL_SLIDE_NUMBER: t
+#+REVEAL_THEME: white
+* Service Discovery
+** Basic Idea
+- Identify running services, available services
+- Know host,port... for binding to services, eg. DB etc
+- Also encompasses Service Registration involving a service
+  registering its details
+- Necessary for typical SOA, multi tier apps etc.
+
+** Examples
+- DNS - The internet scale website (service) discovery
+- ~/etc/services~
+
+*** Simple app
+#+caption: simple webapp
+#+begin_src ditaa :file images/simple.png -r -S
+
+                       +------------+
+                       |   auth     |
+                       |            |
+                       +------------+
+  +-----------+        +------------+     +-----------+
+  |           |        |   req      |     |           |
+  |  webapp   |        |  processor |     |   DB      |
+  +-----------+        +------------+     +-----------+
+
+#+end_src
+
+#+REVEAL: split
+
+Discovery! which nodes do processing?
+
+#+begin_src ditaa :file images/simple2.png -r -S
+
+                                  
+  +-----------+        +------------+
+  |           |        |            |
+  |  webapp   |        |  req proc  |
+  +-----------+        +------------+
+
+
+#+end_src
+
+#+REVEAL: split
+
+#+begin_src ditaa :file images/simple3.png -r -S
+
+                                              +------+
+                                              |  proc|
+  +-----------+        +------------+         +------+
+  |           |        |            |         +------+
+  |  webapp   |        |  LB        |         |  proc|
+  +-----------+        +------------+         +------+
+                                              +------+
+                                              |  proc|
+                                              +------+
+
+
+#+end_src
+
+Balance requests among different nodes with LB, however, an
+anti-pattern! As this now introduces a single point of failure
+
+** Problems
+- Service Discovery?
+- Health Checking
+- Configuration Management: whether a configuration file change can be
+  reflected in all nodes easily?
+
+** Question
+How do various services sync on their activities & come to agree on
+the basic information about their environment
+
+
+* Chubby
+- http://research.google.com/archive/chubby.html
+- Not an algo paper, very much an engineering paper.  In fact
+  excellent use of algorithmic concepts & create a practical system
+  usable by many apps
+
+#+begin_quote
+Building Chubby was an engineering effort required to fill the needs
+mentioned above; it was not research. We claim no new algorithms or
+techniques. The purpose of this paper is to describe what we did and
+why, rather than to advocate it.
+#+end_quote
+
+** Basic Idea
+- Distributed lock server
+- Allow leader to discover clients
+- Allow clients to elect leaders
+- Provided a K-V store
+- Coarse grained lock service for loosely coupled distributed systems
+- At its core, Paxos (Sort of a Paxos as a Service thing)
+- Later an inspiration for ZK, doozerd, etcd & now consul
+
+** Key design ideas
+- Lock server, as opposed to providing a library for say, Paxos
+- Small filestore kind of service for clients to share information
+
+ 
+* Consul
+- Opiniated service discovery tool
+- Abstractions for service discovery, monitoring
+- Provides HTTP & DNS interfaces
+- Agents running on every node, servers additinaly host the KV store and participate in raft
+- DNS interface allows existing services to use consul without any modifications
+
+** Architecture
+
+
+*** KV Store
+**** Consistency
+CP model, ensured via Raft consensus by consul servers
+Three modes
+***** default  
++ all reads go through the leader
++ However in a network partition, potential stale value possible for reads only. 
++ Primarily because reads are serviced by a leader without commiting into the raft log yet
++ Sort of performance tradeoff, against consistency (for reads only)
++ Sort of default for etcd. 
++ Writes are guaranteed to be consistent
+
+***** consistent
+- all reads go through leader, also there is one more round trip to
+ensure that the leader in quorum only services read. 
+- Truly consistent mode
+- Potentially useful for things like leader election which must be truly consistent
+
+***** stale 
+- Any server node services a read
+- Potential stale value possible within 50ms of the leader
+- Tradeoff : fast & scaleable reads (this is default in k-v stores like etcd)
+
+**** Rest API
+Demo
+
+**** Leader Election
+- Leverage K-V store to aid in leader elections
+- Use an agreed upon key, of sort ~service/<service-name>/leader~
+- Use of sessions (Similar to Chubby Locks.. Advisory not Mandatory)
+
+*** Health checks
+- Simple script on nodes running agents.
+- Need to provide nagios style 0,1,2 status
+- Consul combines a service level health checks + Serf, a gossip based protocol to check for agents
+
