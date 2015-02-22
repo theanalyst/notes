@@ -25,10 +25,10 @@
 #+caption: simple webapp
 #+begin_src ditaa :file images/simple.png -r -S
 
-                       +------------+
-                       |   auth     |
-                       |            |
-                       +------------+
+		       +------------+
+		       |   auth     |
+		       |            |
+		       +------------+
   +-----------+        +------------+     +-----------+
   |           |        |   req      |     |           |
   |  webapp   |        |  processor |     |   DB      |
@@ -42,7 +42,7 @@ Discovery! which nodes do processing?
 
 #+begin_src ditaa :file images/simple2.png -r -S
 
-                                  
+
   +-----------+        +------------+
   |           |        |            |
   |  webapp   |        |  req proc  |
@@ -55,15 +55,15 @@ Discovery! which nodes do processing?
 
 #+begin_src ditaa :file images/simple3.png -r -S
 
-                                              +------+
-                                              |  proc|
+					      +------+
+					      |  proc|
   +-----------+        +------------+         +------+
   |           |        |            |         +------+
   |  webapp   |        |  LB        |         |  proc|
   +-----------+        +------------+         +------+
-                                              +------+
-                                              |  proc|
-                                              +------+
+					      +------+
+					      |  proc|
+					      +------+
 
 
 #+end_src
@@ -76,13 +76,13 @@ anti-pattern! As this now introduces a single point of failure
 - Health Checking
 - Configuration Management: whether a configuration file change can be
   reflected in all nodes easily?
-  
-** Question
+
+** Problem Statement
 How do various services sync on their activities & come to agree on
 the basic information about their environment
 
-
 * Chubby
+
 - http://research.google.com/archive/chubby.html
 - Not an algo paper, very much an engineering paper.  In fact
   excellent use of algorithmic concepts & create a practical system
@@ -95,20 +95,28 @@ techniques. The purpose of this paper is to describe what we did and
 why, rather than to advocate it.
 #+end_quote
 
-** Basic Idea
-- Distributed lock server
-- Allow leader to discover clients
-- Allow clients to elect leaders
-- Provided a K-V store
+#+REVEAL: split
+
+
 - Coarse grained lock service for loosely coupled distributed systems
 - At its core, Paxos (Sort of a Paxos as a Service thing)
+- Primarily, a distributed lock server
 - Later an inspiration for ZK, doozerd, etcd & now consul
 
 ** Key design ideas
 - Lock server, as opposed to providing a library for say, Paxos
 - Small filestore kind of service for clients to share information
 
- 
+** Usecases
+- Allow leader to discover clients
+- Allow clients to elect leaders
+- Provided a K-V store
+
+
+** Locks
+- Locks are advisory, not mandatory.
+- Upto the clients to ensure they don't
+
 * Consul
 - Opiniated service discovery tool
 - Abstractions for service discovery, monitoring
@@ -117,36 +125,55 @@ why, rather than to advocate it.
 - DNS interface allows existing services to use consul without any modifications
 
 ** Architecture
-TBD
+file:images/consul-arch.png
 
-*** KV Store
-**** Consistency
+** KV Store
+*** Consistency
 CP model, ensured via Raft consensus by consul servers
 Three modes
-***** default  
+
+#+REVEAL: split
+**** default
 - all reads go through the leader
-- However in a network partition, potential stale value possible for reads only. 
+- However in a network partition, potential stale value possible for reads only.
+- Raft + leader leasing , a small interval of transient time after
+  which leader assumes its role stable (300 ms)
+https://github.com/hashicorp/raft/commit/73bd785f4505fb27b97b253f37d40e4922d34227
+#+begin_src go
+- LeaderLeaseTimeout: time.Second,
++ LeaderLeaseTimeout: 300 * time.Millisecond,
+#+end_src
 - Primarily because reads are serviced by a leader without commiting into the raft log yet
 - Sort of performance tradeoff, against consistency (for reads only)
   as this otherwise involves a round trip to the leader in quorum
-- Sort of default for etcd. 
-- Writes are guaranteed to be consistent, so are reads after writes. 
-
-***** consistent
+- Sort of default for etcd.
+- Writes are guaranteed to be consistent, as they go through the raft
+  logs, so are reads after writes.
+#+REVEAL: split
+**** consistent
 - all reads go through leader, also there is one more round trip to
-ensure that the leader in quorum only services read. 
+ensure that the leader in quorum only services read.
 - Truly consistent mode
-- Potentially useful for things like leader election which must be truly consistent
-
-***** stale 
+#+REVEAL: split
+**** stale
 - Any server node services a read
 - Potential stale value possible within 50ms of the leader
 - Tradeoff : fast & scaleable reads (this is default in k-v stores like etcd)
 
-**** Leader Election
+*** Leader Election
 - Leverage K-V store to aid in leader elections
 - Use an agreed upon key, of sort ~service/<service-name>/leader~
 - Use of sessions (Similar to Chubby Locks.. Advisory not Mandatory)
+- Once a session is created, it's sort of like a chubby lock, released
+  when either serf/health check fails, service/node dereg or a manual release
+- Clients can watch the key (blocking read) and check for the session attribute
+- A non existant session attribute implies no leader, and the session
+  is up for grabs
+
+#+begin_src restclient
+
+#+end_src
+
 
 *** Health checks
 - Simple script on nodes running agents.
@@ -157,7 +184,7 @@ ensure that the leader in quorum only services read.
 **** Rest API
 #+begin_src restclient
 #-*- restclient -*-
-# K-V store 
+# K-V store
 # index
 GET http://localhost:8500/v1/kv/?recurse
 
@@ -166,7 +193,7 @@ GET http://localhost:8500/v1/kv/?recurse
 # also consistent? and stale? modes
 GET http://localhost:8500/v1/kv/foo
 
-  
+
 # update the same value?
 PUT http://localhost:8500/v1/kv/foo
 ContentType: text/json
@@ -193,7 +220,7 @@ PUT http://localhost:8500/v1/session/create
   "Node": "node2",
   "Checks": ["service:ceph"]
 }
-  
+
 
 ## Leader Election
 PUT http://localhost:8500/v1/kv/service/ceph/leader?d8b758ac-6810-a093-a839-76ee0969898c
@@ -204,4 +231,4 @@ GET http://localhost:8500/v1/kv/service/ceph/leader
 
 # Step down
 PUT http://localhost:8500/v1/kv/service/ceph/leader?release=3eeab2e5-4c1a-fd92-8beb-9fcc795d8ee6
-#+end_src     
+#+end_src
