@@ -23,12 +23,15 @@
 
 *** Simple app
 #+caption: simple webapp
-#+begin_src ditaa :file images/simple.png -r -S
+#+header: :exports results
+#+begin_src ditaa :file images/simple.png :cmdline -r -S
 
-		       +------------+
-		       |   auth     |
-		       |            |
-		       +------------+
+                       +------------+
+                       |   auth     |
+                       |            |
+                       +------------+
+
+
   +-----------+        +------------+     +-----------+
   |           |        |   req      |     |           |
   |  webapp   |        |  processor |     |   DB      |
@@ -40,7 +43,9 @@
 
 Discovery! which nodes do processing?
 
-#+begin_src ditaa :file images/simple2.png -r -S
+#+caption: Processing
+#+header: :exports results
+#+begin_src ditaa :file images/simple2.png :cmdline -r -S
 
 
   +-----------+        +------------+
@@ -50,20 +55,21 @@ Discovery! which nodes do processing?
 
 
 #+end_src
+#+caption: a typical solution
+#+header: :exports results
+#+begin_src ditaa :file images/simple3.png :cmdline -r -S
 
-#+REVEAL: split
-
-#+begin_src ditaa :file images/simple3.png -r -S
-
-					      +------+
-					      |  proc|
+                                              +------+
+                                              |  proc|
   +-----------+        +------------+         +------+
+  |           |        |            |
   |           |        |            |         +------+
   |  webapp   |        |  LB        |         |  proc|
   +-----------+        +------------+         +------+
-					      +------+
-					      |  proc|
-					      +------+
+
+                                              +------+
+                                              |  proc|
+                                              +------+
 
 
 #+end_src
