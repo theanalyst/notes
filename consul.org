@@ -2,12 +2,13 @@
 #+AUTHOR: Abhishek L
 #+EMAIL: @abhishekl
 #+REVEAL_TRANS: none
-#+OPTIONS: reveal_progress toc:nil
+#+OPTIONS: reveal_progress toc:nil num:nil
 #+REVEAL_MIN_SCALE: 0.01
 #+REVEAL_MARGIN: 0.1
-#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/3.0.0
+#+REVEAL_ROOT: ./reveal.js-3.0.0
 #+REVEAL_SLIDE_NUMBER: t
 #+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 2
 * Service Discovery
 ** Basic Idea
 - Identify running services, available services
