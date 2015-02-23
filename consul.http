@@ -1,0 +1,53 @@
+#-*- restclient -*-
+# K-V store 
+# index
+# (setq restclient-same-buffer-response t)
+GET http://localhost:8500/v1/kv/?recurse
+
+
+# Get a value from the k-v store
+# also consistent? and stale? modes
+GET http://localhost:8500/v1/kv/foo
+
+  
+# update the same value?
+PUT http://localhost:8500/v1/kv/foo
+ContentType: text/json
+barbar
+
+# check & set
+PUT http://localhost:8500/v1/kv/foo?cas=2834
+bar
+
+# Wait for change (and for a time of 120s)
+# (setq restclient-same-buffer-response nil)
+GET http://localhost:8500/v1/kv/foo?index=2866&wait=120s
+
+# Services
+GET http://localhost:8500/v1/agent/services
+
+
+# Incomplete
+# Session
+# (setq restclient-same-buffer-response nil)
+PUT http://localhost:8500/v1/session/create
+{
+  "LockDelay": "60s",
+  "Name": "ceph-service-lock",
+  "Node": "node2",
+  "Checks": ["service:ceph"]
+}
+  
+
+## Leader Election
+PUT http://localhost:8500/v1/kv/service/ceph/leader
+node4
+
+# Watch for the key changes 
+PUT http://localhost:8500/v1/kv/service/ceph/leader?acquire=f6588c49-a7a8-bcbb-fff5-d5ce019078e4
+node3
+# fo
+GET http://localhost:8500/v1/kv/service/ceph/leader
+
+# Step down
+PUT http://localhost:8500/v1/kv/service/ceph/leader?release=69452c9c-257c-301d-ec4b-08e9230b7d19
