@@ -98,7 +98,7 @@ the basic information about their environment
 Building Chubby was an engineering effort required to fill the needs
 mentioned above; it was not research. We claim no new algorithms or
 techniques. The purpose of this paper is to describe what we did and
-why, rather than to advocate it.
+why, rather than to advocate it. -- Mike Burrows, Google
 #+end_quote
 
 #+REVEAL: split
@@ -117,12 +117,15 @@ why, rather than to advocate it.
 - Allow leader to discover clients
 - Allow clients to elect leaders
 - Provided a K-V store
-
+- Used by GFS to elect master
+- Used by BigTable to allow clients to disover master & vice versa
 
 ** Locks
-- Locks are advisory, not mandatory.
-- Upto the clients to ensure they don't
-
+We'll revisit this session after leader election
+- Coarse grained locks (Fine grained locks are expected to be built by clients)
+- Locks are advisory, not mandatory, means locked objects are not inaccessible to other clients.
+- ~LockDelay~ parameter used to ensure other services cannot acquire the lock until this time after Lock expiry
+- A Sequencer requestable by clients, in order to verify locking, can be attached to requests
 * Consul
 - Opiniated service discovery tool
 - Abstractions for service discovery, monitoring
@@ -130,61 +133,57 @@ why, rather than to advocate it.
 - Agents running on every node, servers additinaly host the KV store and participate in raft
 - DNS interface allows existing services to use consul without any modifications
 
-** Architecture
+* Architecture
 file:images/consul-arch.png
 
-** KV Store
-*** Consistency
+* KV Store
+** Consistency
 CP model, ensured via Raft consensus by consul servers
 Three modes
 
-#+REVEAL: split
-**** default
-- all reads go through the leader
-- However in a network partition, potential stale value possible for reads only.
+*** default
+- all reads go through the leader, however in a network partition, potential stale value possible for reads only.
 - Raft + leader leasing , a small interval of transient time after
-  which leader assumes its role stable (300 ms)
-https://github.com/hashicorp/raft/commit/73bd785f4505fb27b97b253f37d40e4922d34227
-#+begin_src go
-- LeaderLeaseTimeout: time.Second,
-+ LeaderLeaseTimeout: 300 * time.Millisecond,
-#+end_src
+  which leader assumes its role stable (300 ms) [1]
 - Primarily because reads are serviced by a leader without commiting into the raft log yet
 - Sort of performance tradeoff, against consistency (for reads only)
   as this otherwise involves a round trip to the leader in quorum
-- Sort of default for etcd.
 - Writes are guaranteed to be consistent, as they go through the raft
   logs, so are reads after writes.
-#+REVEAL: split
-**** consistent
+
+*** consistent
 - all reads go through leader, also there is one more round trip to
-ensure that the leader in quorum only services read.
+  ensure that the leader in quorum only services read.
 - Truly consistent mode
-#+REVEAL: split
-**** stale
+
+*** stale
 - Any server node services a read
 - Potential stale value possible within 50ms of the leader
 - Tradeoff : fast & scaleable reads (this is default in k-v stores like etcd)
 
-*** Leader Election
+** Leader Election
 - Leverage K-V store to aid in leader elections
 - Use an agreed upon key, of sort ~service/<service-name>/leader~
 - Use of sessions (Similar to Chubby Locks.. Advisory not Mandatory)
-- Once a session is created, it's sort of like a chubby lock, released
-  when either serf/health check fails, service/node dereg or a manual release
+- Once a session is created, released when either serf/health check
+  fails, service/node dereg or a manual release
 - Clients can watch the key (blocking read) and check for the session attribute
 - A non existant session attribute implies no leader, and the session
   is up for grabs
+#+REVEAL: split
+- ~(Key,LockIndex,Session)~ acts as a unique sequencer
+- ~LockDelay~ specifiable 
 
-#+begin_src restclient
-
-#+end_src
-
-
-*** Health checks
+** Health checks
+- Intrinsic membership checks with Serf, a gossip based protocol
 - Simple script on nodes running agents.
 - Need to provide nagios style 0,1,2 status
-- Consul combines a service level health checks + Serf, a gossip based protocol to check for agents
+
+** Current Deployment
+1) Each service registers its ip address as an A record for the address: `<service_name>.service.consul`
+2) Each service registers its hostname: `<hostname>.node.consul` as an SRV record for `<service_name>.service.consul`
+3) Depending on the service Puppet blocks until an address is resolvable or SRV records are retrievable
+4) Fail if a DNS address is not resolvable
 
 ** Demo
 **** Rest API
@@ -238,3 +237,10 @@ GET http://localhost:8500/v1/kv/service/ceph/leader
 # Step down
 PUT http://localhost:8500/v1/kv/service/ceph/leader?release=3eeab2e5-4c1a-fd92-8beb-9fcc795d8ee6
 #+end_src
+
+[1]: https://github.com/hashicorp/raft/commit/73bd785f4505fb27b97b253f37d40e4922d34227
+#+begin_src go
+- LeaderLeaseTimeout: time.Second,
++ LeaderLeaseTimeout: 300 * time.Millisecond,
+#+end_src
+y
