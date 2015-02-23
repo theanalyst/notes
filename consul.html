@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Service Discovery &amp; Consul</title>
+<meta name="author" content="(Abhishek L)"/>
+
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/reveal.min.css"/>
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/white.css" id="theme"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'http://cdn.jsdelivr.net/reveal.js/3.0.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section>
+<h1>Service Discovery &amp; Consul</h1>
+<h2>Abhishek L</h2>
+<h2><a href="mailto:@abhishekl">@abhishekl</a></h2>
+<h2></h2></section>
+<section id="sec-1" >
+
+<h2>Service Discovery</h2>
+</section>
+<section>
+<section id="sec-1-1" >
+
+<h3>Basic Idea</h3>
+<ul class="org-ul">
+<li>Identify running services, available services
+</li>
+<li>Know host,port&#x2026; for binding to services, eg. DB etc
+</li>
+<li>Also encompasses Service Registration involving a service
+registering its details
+</li>
+<li>Necessary for typical SOA, multi tier apps etc.
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-1-2" >
+
+<h3>Examples</h3>
+<ul class="org-ul">
+<li>DNS - The internet scale website (service) discovery
+</li>
+<li><code>/etc/services</code>
+</li>
+</ul>
+
+</section>
+<section id="sec-1-2-1" >
+
+<h4>Simple app</h4>
+<img src="images/simple.png" alt="simple.png" />
+
+</section>
+<section>
+
+<p>
+Discovery! which nodes do processing?
+</p>
+
+<img src="images/simple2.png" alt="simple2.png" />
+
+<img src="images/simple3.png" alt="simple3.png" />
+
+<p>
+Balance requests among different nodes with LB, however, an
+anti-pattern! As this now introduces a single point of failure
+</p>
+</section>
+
+</section>
+<section>
+<section id="sec-1-3" >
+
+<h3>Problems</h3>
+<ul class="org-ul">
+<li>Service Discovery?
+</li>
+<li>Health Checking
+</li>
+<li>Configuration Management: whether a configuration file change can be
+reflected in all nodes easily?
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-1-4" >
+
+<h3>Problem Statement</h3>
+<p>
+How do various services sync on their activities &amp; come to agree on
+the basic information about their environment
+</p>
+</section>
+
+</section>
+<section id="sec-2" >
+
+<h2>Chubby</h2>
+<ul class="org-ul">
+<li><a href="http://research.google.com/archive/chubby.html">http://research.google.com/archive/chubby.html</a>
+</li>
+<li>Not an algo paper, very much an engineering paper.  In fact
+excellent use of algorithmic concepts &amp; create a practical system
+usable by many apps
+</li>
+</ul>
+
+<blockquote>
+<p>
+Building Chubby was an engineering effort required to fill the needs
+mentioned above; it was not research. We claim no new algorithms or
+techniques. The purpose of this paper is to describe what we did and
+why, rather than to advocate it. &#x2013; Mike Burrows, Google
+</p>
+</blockquote>
+
+</section>
+<section>
+
+
+<ul class="org-ul">
+<li>Coarse grained lock service for loosely coupled distributed systems
+</li>
+<li>At its core, Paxos (Sort of a Paxos as a Service thing)
+</li>
+<li>Primarily, a distributed lock server
+</li>
+<li>Later an inspiration for ZK, doozerd, etcd &amp; now consul
+</li>
+</ul>
+
+</section>
+<section>
+<section id="sec-2-1" >
+
+<h3>Key design ideas</h3>
+<ul class="org-ul">
+<li>Lock server, as opposed to providing a library for say, Paxos
+</li>
+<li>Small filestore kind of service for clients to share information
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-2-2" >
+
+<h3>Usecases</h3>
+<ul class="org-ul">
+<li>Allow leader to discover clients
+</li>
+<li>Allow clients to elect leaders
+</li>
+<li>Provided a K-V store
+</li>
+<li>Used by GFS to elect master
+</li>
+<li>Used by BigTable to allow clients to disover master &amp; vice versa
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-2-3" >
+
+<h3>Locks</h3>
+<p>
+We'll revisit this session after leader election
+</p>
+<ul class="org-ul">
+<li>Coarse grained locks (Fine grained locks are expected to be built by clients)
+</li>
+<li>Locks are advisory, not mandatory, means locked objects are not inaccessible to other clients.
+</li>
+<li><code>LockDelay</code> parameter used to ensure other services cannot acquire the lock until this time after Lock expiry
+</li>
+<li>A Sequencer requestable by clients, in order to verify locking, can be attached to requests
+</li>
+</ul>
+</section>
+</section>
+<section id="sec-3" >
+
+<h2>Consul</h2>
+<ul class="org-ul">
+<li>Opiniated service discovery tool
+</li>
+<li>Abstractions for service discovery, monitoring
+</li>
+<li>Provides HTTP &amp; DNS interfaces
+</li>
+<li>Agents running on every node, servers additinaly host the KV store and participate in raft
+</li>
+<li>DNS interface allows existing services to use consul without any modifications
+</li>
+</ul>
+
+</section>
+<section id="sec-4" >
+
+<h2>Architecture</h2>
+<img src="images/consul-arch.png" alt="consul-arch.png" />
+
+</section>
+<section id="sec-5" >
+
+<h2>KV Store</h2>
+</section>
+<section>
+<section id="sec-5-1" >
+
+<h3>Consistency</h3>
+<p>
+CP model, ensured via Raft consensus by consul servers
+Three modes
+</p>
+
+</section>
+<section id="sec-5-1-1" >
+
+<h4>default</h4>
+<ul class="org-ul">
+<li>all reads go through the leader, however in a network partition, potential stale value possible for reads only.
+</li>
+<li>Raft + leader leasing , a small interval of transient time after
+which leader assumes its role stable (300 ms) <sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</li>
+<li>Primarily because reads are serviced by a leader without commiting into the raft log yet
+</li>
+<li>Sort of performance tradeoff, against consistency (for reads only)
+as this otherwise involves a round trip to the leader in quorum
+</li>
+<li>Writes are guaranteed to be consistent, as they go through the raft
+logs, so are reads after writes.
+</li>
+</ul>
+
+</section>
+<section id="sec-5-1-2" >
+
+<h4>consistent</h4>
+<ul class="org-ul">
+<li>all reads go through leader, also there is one more round trip to
+ensure that the leader in quorum only services read.
+</li>
+<li>Truly consistent mode
+</li>
+</ul>
+
+</section>
+<section id="sec-5-1-3" >
+
+<h4>stale</h4>
+<ul class="org-ul">
+<li>Any server node services a read
+</li>
+<li>Potential stale value possible within 50ms of the leader
+</li>
+<li>Tradeoff : fast &amp; scaleable reads (this is default in k-v stores like etcd)
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-5-2" >
+
+<h3>Leader Election</h3>
+<ul class="org-ul">
+<li>Leverage K-V store to aid in leader elections
+</li>
+<li>Use an agreed upon key, of sort <code>service/&lt;service-name&gt;/leader</code>
+</li>
+<li>Use of sessions (Similar to Chubby Locks.. Advisory not Mandatory)
+</li>
+<li>Once a session is created, released when either serf/health check
+fails, service/node dereg or a manual release
+</li>
+<li>Clients can watch the key (blocking read) and check for the session attribute
+</li>
+<li>A non existant session attribute implies no leader, and the session
+is up for grabs
+</li>
+</ul>
+</section>
+<section>
+<ul class="org-ul">
+<li><code>(Key,LockIndex,Session)</code> acts as a unique sequencer
+</li>
+<li><code>LockDelay</code> specifiable 
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-5-3" >
+
+<h3>Health checks</h3>
+<ul class="org-ul">
+<li>Intrinsic membership checks with Serf, a gossip based protocol
+</li>
+<li>Simple script on nodes running agents.
+</li>
+<li>Need to provide nagios style 0,1,2 status
+</li>
+</ul>
+</section>
+
+</section>
+<section>
+<section id="sec-5-4" >
+
+<h3>Current Deployment</h3>
+<ol class="org-ol">
+<li>Each service registers its ip address as an A record for the address: `&lt;service<sub>name</sub>&gt;.service.consul`
+</li>
+<li>Each service registers its hostname: `&lt;hostname&gt;.node.consul` as an SRV record for `&lt;service<sub>name</sub>&gt;.service.consul`
+</li>
+<li>Depending on the service Puppet blocks until an address is resolvable or SRV records are retrievable
+</li>
+<li>Fail if a DNS address is not resolvable
+</li>
+</ol>
+</section>
+
+</section>
+<section>
+<section id="sec-5-5" >
+
+<h3>Demo</h3>
+<ul class="org-ul"><li class="fragment none">Rest API<br/><div class="org-src-container">
+
+<pre  class="src src-restclient"><span style="color: #75715E;">#</span><span style="color: #75715E;">-*- restclient -*-</span>
+<span style="color: #75715E;"># </span><span style="color: #75715E;">K-V store</span>
+<span style="color: #75715E;"># </span><span style="color: #75715E;">index</span>
+<span style="color: #F92672;">GET</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/?recurse</span>
+
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Get a value from the k-v store</span>
+<span style="color: #75715E;"># </span><span style="color: #75715E;">also consistent? and stale? modes</span>
+<span style="color: #F92672;">GET</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/foo</span>
+
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">update the same value?</span>
+<span style="color: #F92672;">PUT</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/foo</span>
+<span style="color: #FD971F;">ContentType</span>: <span style="color: #E6DB74;">text/json</span>
+barbar
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">check &amp; set</span>
+<span style="color: #F92672;">PUT</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/foo?cas=2834</span>
+bar
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Wait for change (and for a time of 120s)</span>
+<span style="color: #75715E;"># </span><span style="color: #75715E;">(setq restclient-same-buffer-response t)</span>
+<span style="color: #F92672;">GET</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/foo?index=2866&amp;wait=120s</span>
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Services</span>
+<span style="color: #F92672;">GET</span> <span style="color: #A6E22E;">http://localhost:8500/v1/agent/services</span>
+
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Incomplete</span>
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Session</span>
+<span style="color: #F92672;">PUT</span> <span style="color: #A6E22E;">http://localhost:8500/v1/session/create</span>
+{
+  <span style="color: #E6DB74;">"LockDelay"</span>: <span style="color: #E6DB74;">"60s"</span>,
+  <span style="color: #E6DB74;">"Name"</span>: <span style="color: #E6DB74;">"ceph-service-lock"</span>,
+  <span style="color: #E6DB74;">"Node"</span>: <span style="color: #E6DB74;">"node2"</span>,
+  <span style="color: #E6DB74;">"Checks"</span>: [<span style="color: #E6DB74;">"service:ceph"</span>]
+}
+
+
+<span style="color: #75715E;">#</span><span style="color: #75715E;"># Leader Election</span>
+<span style="color: #F92672;">PUT</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/service/ceph/leader?d8b758ac-6810-a093-a839-76ee0969898c</span>
+node2
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Watch for the key changes</span>
+<span style="color: #F92672;">GET</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/service/ceph/leader</span>
+
+<span style="color: #75715E;"># </span><span style="color: #75715E;">Step down</span>
+<span style="color: #F92672;">PUT</span> <span style="color: #A6E22E;">http://localhost:8500/v1/kv/service/ceph/leader?release=3eeab2e5-4c1a-fd92-8beb-9fcc795d8ee6</span>
+</pre>
+</div>
+</li></ul>
+</section>
+</section>
+</div>
+</div>
+
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/head.min.js"></script>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/js/reveal.min.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: true,
+rollingLinks: false,
+keyboard: true,
+overview: true,
+margin: 0.10,
+minScale: 0.01,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'none', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+]
+});
+</script>
+</body>
+</html>
