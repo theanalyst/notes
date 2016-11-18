@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Service Discovery</title>
+<meta name="author" content="(Abhishek Lekshmanan)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/white.css" id="theme"/>
+
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'http://cdn.jsdelivr.net/reveal.js/3.0.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h1 class="title">Service Discovery</h1><h2 class="author">Abhishek Lekshmanan</h2><p class="date">Created: 2016-11-18 Fri 10:26</p>
+</section>
+<section id="table-of-contents">
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#/slide-orgheadline1">Basic Idea</a></li>
+</ul>
+</li>
+<li><a href="#/slide-orgheadline5">Examples</a>
+<ul>
+<li><a href="#/slide-orgheadline2">Simple app</a></li>
+<li><a href="#/slide-orgheadline3">Problems</a></li>
+<li><a href="#/slide-orgheadline4">Problem Statement</a></li>
+</ul>
+</li>
+<li><a href="#/slide-orgheadline8">Chubby</a>
+<ul>
+<li><a href="#/slide-orgheadline6">Key design ideas</a></li>
+<li><a href="#/slide-orgheadline7">Usecases</a></li>
+</ul>
+</div>
+</div>
+</section>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline1">
+<h3 id="orgheadline1">Basic Idea</h3>
+<ul>
+<li>Identify running services, available services</li>
+<li>Know host,port&#x2026; for binding to services, eg. DB etc</li>
+<li>Also encompasses Service Registration involving a service
+registering its details</li>
+<li>Necessary for typical SOA, multi tier apps etc.</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline5">
+<h2 id="orgheadline5">Examples</h2>
+<ul>
+<li>DNS - The internet scale website (service) discovery</li>
+<li><code>/etc/services</code></li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline2">
+<h3 id="orgheadline2">Simple app</h3>
+</section>
+<section>
+
+<p>
+Discovery! which nodes do processing?
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline3">
+<h3 id="orgheadline3">Problems</h3>
+<ul>
+<li>Service Discovery?</li>
+<li>Health Checking</li>
+<li>Configuration Management: whether a configuration file change can be
+reflected in all nodes easily?</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline4">
+<h3 id="orgheadline4">Problem Statement</h3>
+<p>
+How do various services sync on their activities &amp; come to agree on
+the basic information about their environment
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline8">
+<h2 id="orgheadline8">Chubby</h2>
+<ul>
+<li><a href="http://research.google.com/archive/chubby.html">http://research.google.com/archive/chubby.html</a></li>
+<li>Not an algo paper, very much an engineering paper.  In fact
+excellent use of algorithmic concepts &amp; create a practical system
+usable by many apps</li>
+
+</ul>
+
+<blockquote nil>
+<p>
+Building Chubby was an engineering effort required to fill the needs
+mentioned above; it was not research. We claim no new algorithms or
+techniques. The purpose of this paper is to describe what we did and
+why, rather than to advocate it. &#x2013; Mike Burrows, Google
+</p>
+</blockquote>
+
+</section>
+<section>
+
+
+<ul>
+<li>Coarse grained lock service for loosely coupled distributed systems</li>
+<li>At its core, Paxos (Sort of a Paxos as a Service thing)</li>
+<li>Primarily, a distributed lock server</li>
+<li>Later an inspiration for ZK, doozerd, etcd &amp; now consul</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline6">
+<h3 id="orgheadline6">Key design ideas</h3>
+<ul>
+<li>Lock server, as opposed to providing a library for say, Paxos</li>
+<li>Small filestore kind of service for clients to share information</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline7">
+<h3 id="orgheadline7">Usecases</h3>
+<ul>
+<li>Allow leader to discover clients</li>
+<li>Allow clients to elect leaders</li>
+<li>Provided a K-V store</li>
+<li>Used by GFS to elect master</li>
+<li>Used by BigTable to allow clients to disover master &amp; vice versa</li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/head.min.js"></script>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+margin: 0.10,
+minScale: 0.01,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'none', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>
